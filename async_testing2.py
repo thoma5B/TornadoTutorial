@@ -1,47 +1,38 @@
-"""
-This is a test for my new DasKeyboard
-
-Let's see how much I like it when coding.
-"""
-
-from tornado import testing
-
-class MyTestCase(testing.AsyncTestCase):
-    def test_delay(self):
-        start = time.time()
-        delay_async(1, callback=self.stop)
-        self.wait()
-        duration = time.time() - start
-        self.assertAlmostEqual(duration, 1, places=2)
-
-
-
-
-
-"""
-I don't know, if I like this kind of DasKeyboard
-
-a problem, is with the signs =
-
-and the actually very frequently used _ according 
-to pep-8 rules
-
-
-
-
-"""
-
 from motor import MotorClient
-from tornado import testing
+from tornado import gen, testing
+from tornado.testing import gen_test
+
+from pymongo import MongoClient
 
 
 class MyTestCase(testing.AsyncTestCase):
     def setUp(self):
-        super().setUp()
+        super(MyTestCase, self).setUp()
         self.client = MotorClient()
+        # wait for the setup coroutine to complete before beginning the test
+        self.io_loop.run_sync(self.setup_coro)
+        
+        # for visual control
+        client = MongoClient()
+        db = client.test
+        cursor = db.collection.find()
+        for document in cursor:
+            print(document)
 
-    def test_find_one(self):
+    @gen.coroutine
+    def setup_coro(self):
         collection = self.client.test.collection
-        document = yield collection.find_one({})
 
+        # Clean up from prior runs:
+        yield collection.remove()
 
+        yield collection.insert({'_id': 0})
+        yield collection.insert({'_id': 1, 'key': 'value'})
+        yield collection.insert({'_id': 2})
+
+    @gen_test
+    def test_find_one(self):
+
+        collection = self.client.test.collection
+        document = yield collection.find_one({'_id': 1})
+        self.assertEqual({'_id': 1, 'key': 'value'}, document)
